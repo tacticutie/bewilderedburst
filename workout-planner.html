@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weekly Workout Planner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827;
+        }
+        .day-card {
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .day-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .modal {
+            display: none;
+        }
+        .modal.flex {
+            display: flex;
+        }
+    </style>
+</head>
+<body class="text-white">
+
+    <div id="app-container" class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600">
+                Weekly Workout Planner
+            </h1>
+            <p class="text-gray-400 mt-2">Craft your perfect week. Add, edit, and track your workouts in real-time.</p>
+        </header>
+
+        <main id="calendar-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-6">
+            <!-- Day cards will be dynamically inserted here -->
+        </main>
+
+        <footer class="text-center mt-12 text-gray-500 text-sm">
+            <p>Your User ID for collaboration: <span id="userId" class="font-mono bg-gray-800 px-2 py-1 rounded"></span></p>
+            <p class="mt-2">Stay consistent. Your future self will thank you.</p>
+        </footer>
+    </div>
+
+    <!-- Workout Modal -->
+    <div id="workout-modal" class="modal fixed inset-0 bg-black bg-opacity-75 items-center justify-center p-4">
+        <div class="bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6">
+            <h2 id="workout-modal-title" class="text-2xl font-bold mb-4">Edit Workout</h2>
+            <form id="workout-form">
+                <input type="hidden" id="workout-day">
+                <div>
+                    <label for="workout-name" class="block text-sm font-medium text-gray-300 mb-1">Workout Name</label>
+                    <input type="text" id="workout-name" name="workout-name" placeholder="e.g., Chest & Triceps" class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500" required>
+                </div>
+                <div class="flex justify-end gap-3 mt-6">
+                    <button type="button" id="close-workout-modal" class="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded-md transition-colors">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-md transition-colors font-semibold">Save Workout</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Exercise Modal -->
+    <div id="exercise-modal" class="modal fixed inset-0 bg-black bg-opacity-75 items-center justify-center p-4">
+        <div class="bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6">
+            <h2 id="exercise-modal-title" class="text-2xl font-bold mb-4">Add Exercise</h2>
+            <form id="exercise-form">
+                <input type="hidden" id="exercise-day">
+                <input type="hidden" id="exercise-id">
+                <div class="space-y-4">
+                    <div>
+                        <label for="exercise-name" class="block text-sm font-medium text-gray-300 mb-1">Exercise Name</label>
+                        <input type="text" id="exercise-name" placeholder="e.g., Bench Press" class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500" required>
+                    </div>
+                    <div class="grid grid-cols-3 gap-4">
+                        <div>
+                            <label for="exercise-sets" class="block text-sm font-medium text-gray-300 mb-1">Sets</label>
+                            <input type="number" id="exercise-sets" placeholder="e.g., 4" class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500" required>
+                        </div>
+                        <div>
+                            <label for="exercise-reps" class="block text-sm font-medium text-gray-300 mb-1">Reps</label>
+                            <input type="number" id="exercise-reps" placeholder="e.g., 8" class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500" required>
+                        </div>
+                        <div>
+                            <label for="exercise-weight" class="block text-sm font-medium text-gray-300 mb-1">Weight (lbs)</label>
+                            <input type="number" id="exercise-weight" placeholder="e.g., 185" class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-3 mt-6">
+                    <button type="button" id="close-exercise-modal" class="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded-md transition-colors">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-md transition-colors font-semibold">Save Exercise</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, setDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- CONFIG AND STATE ---
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "YOUR_API_KEY", authDomain: "YOUR_AUTH_DOMAIN", projectId: "YOUR_PROJECT_ID" };
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-workout-planner';
+        
+        let app, auth, db, userId;
+        let weekData = {};
+        const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+        const defaultWeekData = () => {
+            const data = {};
+            daysOfWeek.forEach(day => {
+                data[day] = { workoutName: "", exercises: [] };
+            });
+            return data;
+        };
+
+        // --- UI ELEMENTS ---
+        const calendarGrid = document.getElementById('calendar-grid');
+        const workoutModal = document.getElementById('workout-modal');
+        const exerciseModal = document.getElementById('exercise-modal');
+        const workoutForm = document.getElementById('workout-form');
+        const exerciseForm = document.getElementById('exercise-form');
+
+        // --- FIREBASE INITIALIZATION ---
+        async function initializeFirebase() {
+            app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+            setLogLevel('debug');
+
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    userId = user.uid;
+                    document.getElementById('userId').textContent = userId;
+                    listenToWorkouts();
+                } else {
+                    try {
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await signInWithCustomToken(auth, __initial_auth_token);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    } catch (error) {
+                        console.error("Authentication failed:", error);
+                    }
+                }
+            });
+        }
+        
+        // --- DATA HANDLING ---
+        function listenToWorkouts() {
+            if (!userId) return;
+            const docRef = doc(db, `artifacts/${appId}/users/${userId}/workouts`, 'weeklyPlan');
+            
+            onSnapshot(docRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    weekData = docSnap.data();
+                } else {
+                    weekData = defaultWeekData();
+                    saveWorkouts(); // Create the initial document
+                }
+                renderCalendar();
+            }, (error) => {
+                console.error("Error listening to workout data:", error);
+            });
+        }
+
+        async function saveWorkouts() {
+            if (!userId) return;
+            const docRef = doc(db, `artifacts/${appId}/users/${userId}/workouts`, 'weeklyPlan');
+            try {
+                await setDoc(docRef, weekData, { merge: true });
+            } catch (error) {
+                console.error("Error saving workouts:", error);
+            }
+        }
+        
+        // --- RENDERING ---
+        function renderCalendar() {
+            calendarGrid.innerHTML = '';
+            daysOfWeek.forEach(day => {
+                const dayInfo = weekData[day] || { workoutName: "", exercises: [] };
+                const card = document.createElement('div');
+                card.className = 'day-card bg-gray-900 rounded-lg p-4 flex flex-col h-full border border-gray-700';
+                card.dataset.day = day;
+
+                const hasWorkout = dayInfo.workoutName.trim() !== '';
+
+                card.innerHTML = `
+                    <div class="flex-grow">
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="text-xl font-semibold">${day}</h3>
+                            ${hasWorkout ? `
+                                <button data-action="edit-workout" data-day="${day}" class="text-gray-400 hover:text-white transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"></path></svg>
+                                </button>
+                            ` : ''}
+                        </div>
+                        
+                        ${hasWorkout ? `
+                            <p class="text-lg font-bold text-purple-400 mb-3">${dayInfo.workoutName}</p>
+                            <ul class="space-y-2 text-sm text-gray-300">
+                                ${dayInfo.exercises.map(ex => `
+                                    <li class="flex justify-between items-center bg-gray-800 p-2 rounded-md">
+                                        <div>
+                                            <span class="font-medium">${ex.name}</span>: ${ex.sets} sets, ${ex.reps} reps @ ${ex.weight} lbs
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <button data-action="edit-exercise" data-day="${day}" data-id="${ex.id}" class="text-gray-400 hover:text-blue-400">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"></path></svg>
+                                            </button>
+                                            <button data-action="delete-exercise" data-day="${day}" data-id="${ex.id}" class="text-gray-400 hover:text-red-400">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd"></path></svg>
+                                            </button>
+                                        </div>
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        ` : `
+                            <div class="text-center text-gray-500 py-8">
+                                <p>No workout planned.</p>
+                            </div>
+                        `}
+                    </div>
+                    <div class="mt-4 pt-4 border-t border-gray-700">
+                        ${hasWorkout ? `
+                             <button data-action="add-exercise" data-day="${day}" class="w-full text-center py-2 bg-green-600 hover:bg-green-700 rounded-md transition-colors text-sm font-semibold">
+                                Add Exercise
+                            </button>
+                        ` : `
+                             <button data-action="add-workout" data-day="${day}" class="w-full text-center py-2 bg-purple-600 hover:bg-purple-700 rounded-md transition-colors font-semibold">
+                                Add Workout
+                            </button>
+                        `}
+                    </div>
+                `;
+                calendarGrid.appendChild(card);
+            });
+        }
+        
+        // --- MODAL HANDLING ---
+        function openWorkoutModal(day, isEdit = false) {
+            workoutForm.reset();
+            const dayInfo = weekData[day];
+            document.getElementById('workout-day').value = day;
+            document.getElementById('workout-modal-title').textContent = isEdit ? `Edit Workout for ${day}` : `Add Workout for ${day}`;
+            if (isEdit && dayInfo) {
+                document.getElementById('workout-name').value = dayInfo.workoutName;
+            }
+            workoutModal.classList.add('flex');
+        }
+
+        function closeWorkoutModal() {
+            workoutModal.classList.remove('flex');
+        }
+
+        function openExerciseModal(day, exerciseId = null) {
+            exerciseForm.reset();
+            document.getElementById('exercise-day').value = day;
+            document.getElementById('exercise-id').value = exerciseId || '';
+            
+            if (exerciseId) {
+                const exercise = weekData[day].exercises.find(ex => ex.id === exerciseId);
+                document.getElementById('exercise-modal-title').textContent = `Edit Exercise`;
+                document.getElementById('exercise-name').value = exercise.name;
+                document.getElementById('exercise-sets').value = exercise.sets;
+                document.getElementById('exercise-reps').value = exercise.reps;
+                document.getElementById('exercise-weight').value = exercise.weight;
+            } else {
+                document.getElementById('exercise-modal-title').textContent = `Add Exercise to ${day}`;
+            }
+            exerciseModal.classList.add('flex');
+        }
+
+        function closeExerciseModal() {
+            exerciseModal.classList.remove('flex');
+        }
+
+        // --- EVENT LISTENERS ---
+        calendarGrid.addEventListener('click', (e) => {
+            const button = e.target.closest('button');
+            if (!button) return;
+
+            const action = button.dataset.action;
+            const day = button.dataset.day;
+
+            if (action === 'add-workout') {
+                openWorkoutModal(day, false);
+            } else if (action === 'edit-workout') {
+                openWorkoutModal(day, true);
+            } else if (action === 'add-exercise') {
+                openExerciseModal(day);
+            } else if (action === 'edit-exercise') {
+                openExerciseModal(day, button.dataset.id);
+            } else if (action === 'delete-exercise') {
+                weekData[day].exercises = weekData[day].exercises.filter(ex => ex.id !== button.dataset.id);
+                saveWorkouts();
+            }
+        });
+
+        workoutForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const day = document.getElementById('workout-day').value;
+            const workoutName = document.getElementById('workout-name').value;
+            if (!weekData[day]) {
+                weekData[day] = { workoutName: "", exercises: [] };
+            }
+            weekData[day].workoutName = workoutName;
+            saveWorkouts();
+            closeWorkoutModal();
+        });
+
+        exerciseForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const day = document.getElementById('exercise-day').value;
+            const exerciseId = document.getElementById('exercise-id').value;
+
+            const exerciseData = {
+                name: document.getElementById('exercise-name').value,
+                sets: parseInt(document.getElementById('exercise-sets').value),
+                reps: parseInt(document.getElementById('exercise-reps').value),
+                weight: parseFloat(document.getElementById('exercise-weight').value)
+            };
+
+            if (exerciseId) { // Editing existing exercise
+                const index = weekData[day].exercises.findIndex(ex => ex.id === exerciseId);
+                weekData[day].exercises[index] = { ...weekData[day].exercises[index], ...exerciseData };
+            } else { // Adding new exercise
+                exerciseData.id = crypto.randomUUID();
+                weekData[day].exercises.push(exerciseData);
+            }
+            saveWorkouts();
+            closeExerciseModal();
+        });
+
+        document.getElementById('close-workout-modal').addEventListener('click', closeWorkoutModal);
+        document.getElementById('close-exercise-modal').addEventListener('click', closeExerciseModal);
+        
+        // --- STARTUP ---
+        initializeFirebase();
+
+    </script>
+</body>
+</html>
